@@ -113,21 +113,23 @@ function FriendsPage() {
       {/* Search */}
       <div className="glass-card rounded-3xl p-6">
         <p className="text-sm font-medium">Find people</p>
-        <div className="relative mt-3">
-          <input
-            value={searchQuery}
-            onChange={(e) => searchUsers(e.target.value)}
-            placeholder="Search by name…"
-            className="h-10 w-full rounded-xl border border-white/20 bg-white/[0.03] px-3 text-sm outline-none transition focus:border-[#f5a623]/70"
-          />
-          {searchResults.length > 0 && (
-            <div className="absolute left-0 right-0 top-11 z-10 rounded-xl border border-white/15 bg-[#1a1a1a] py-1 shadow-xl">
-              {searchResults.map((p) => {
+        <input
+          value={searchQuery}
+          onChange={(e) => searchUsers(e.target.value)}
+          placeholder="Search by name…"
+          className="mt-3 h-10 w-full rounded-xl border border-white/20 bg-white/[0.03] px-3 text-sm outline-none transition focus:border-[#f5a623]/70"
+        />
+        {searchQuery.trim().length >= 2 && (
+          <div className="mt-3 space-y-2">
+            {searchResults.length === 0 ? (
+              <p className="text-sm text-white/35">No one found with that name.</p>
+            ) : (
+              searchResults.map((p) => {
                 const sent = pendingSent.has(p.id)
                 return (
                   <div
                     key={p.id}
-                    className="flex items-center justify-between px-4 py-2.5 hover:bg-white/[0.04]"
+                    className="flex items-center justify-between rounded-xl border border-white/10 px-3 py-2.5"
                   >
                     <div className="flex items-center gap-2.5">
                       <div className="flex h-7 w-7 items-center justify-center rounded-full bg-white/10 text-xs font-medium">
@@ -148,10 +150,10 @@ function FriendsPage() {
                     </Button>
                   </div>
                 )
-              })}
-            </div>
-          )}
-        </div>
+              })
+            )}
+          </div>
+        )}
       </div>
 
       {/* Incoming requests */}

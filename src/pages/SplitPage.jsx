@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useSplitStore } from '@/store/splitStore'
 import { useReceipt } from '@/context/useReceipt'
+import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/store/authStore'
 
 function SplitPage() {
   const {
@@ -25,10 +27,18 @@ function SplitPage() {
     setChargeMode,
     getTotals,
     isFullyAssigned,
+    groupId,
+    groupName,
+    groupMembers,
+    clearGroupContext,
   } = useSplitStore()
   const { parseResult } = useReceipt()
+  const { user } = useAuthStore()
+  const navigate = useNavigate()
   const [nameInput, setNameInput] = useState('')
   const [copied, setCopied] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   const handleAdd = () => {
     const trimmed = nameInput.trim()
@@ -67,6 +77,68 @@ function SplitPage() {
     await navigator.clipboard.writeText(plainTextSummary)
     setCopied(true)
     setTimeout(() => setCopied(false), 1400)
+  }
+
+  const saveSplit = async () => {
+    if (!groupId || !user) return
+    setSaving(true)
+    setSaveError('')
+
+    const memberMap = Object.fromEntries(groupMembers.map((m) => [m.name, m.userId]))
+    const splitId = crypto.randomUUID()
+
+    const { error: splitError } = await supabase.from('splits').insert({
+      id: splitId,
+      group_id: groupId,
+      title: parseResult?.merchant || 'Split',
+      created_by: user.id,
+    })
+    if (splitError) {
+      setSaveError(splitError.message)
+      setSaving(false)
+      return
+    }
+
+    const itemInserts = []
+    const assignmentInserts = []
+
+    items.forEach((item) => {
+      const assigned = assignments[item.id] || []
+      if (assigned.length === 0) return
+      const itemId = crypto.randomUUID()
+      itemInserts.push({ id: itemId, split_id: splitId, name: item.name, price: item.price })
+      const share = item.price / assigned.length
+      assigned.forEach((name) => {
+        const userId = memberMap[name]
+        if (userId) assignmentInserts.push({ split_item_id: itemId, user_id: userId, amount: share })
+      })
+    })
+
+    if (tax > 0) {
+      const taxItemId = crypto.randomUUID()
+      itemInserts.push({ id: taxItemId, split_id: splitId, name: 'Tax / service', price: tax })
+      people.forEach((name) => {
+        const userId = memberMap[name]
+        const amount = totals[name]?.tax || 0
+        if (userId && amount > 0) assignmentInserts.push({ split_item_id: taxItemId, user_id: userId, amount })
+      })
+    }
+
+    if (tip > 0) {
+      const tipItemId = crypto.randomUUID()
+      itemInserts.push({ id: tipItemId, split_id: splitId, name: 'Tip', price: tip })
+      people.forEach((name) => {
+        const userId = memberMap[name]
+        const amount = totals[name]?.tip || 0
+        if (userId && amount > 0) assignmentInserts.push({ split_item_id: tipItemId, user_id: userId, amount })
+      })
+    }
+
+    if (itemInserts.length > 0) await supabase.from('split_items').insert(itemInserts)
+    if (assignmentInserts.length > 0) await supabase.from('split_assignments').insert(assignmentInserts)
+
+    clearGroupContext()
+    navigate(`/groups/${groupId}`)
   }
 
   if (items.length === 0) {
@@ -124,41 +196,52 @@ function SplitPage() {
         )}
 
         <div className="glass-card rounded-3xl p-6">
-          <h1 className="text-2xl font-semibold md:text-3xl">Split the Bill</h1>
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-semibold md:text-3xl">Split the Bill</h1>
+            {groupName && (
+              <span className="rounded-full border border-[#f5a623]/30 bg-[#f5a623]/10 px-3 py-1 text-xs text-[#f7bd57]">
+                {groupName}
+              </span>
+            )}
+          </div>
           <div className="mt-4 flex flex-wrap gap-2">
             {people.map((person) => (
               <span
                 key={person}
-                className="flex items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.05] py-1 pl-3 pr-2 text-sm"
+                className={`flex items-center gap-1.5 rounded-full border border-white/20 bg-white/[0.05] py-1 text-sm ${groupId ? 'px-3' : 'pl-3 pr-2'}`}
               >
                 {person}
-                <button
-                  type="button"
-                  onClick={() => removePerson(person)}
-                  className="flex h-4 w-4 items-center justify-center rounded-full text-white/40 transition hover:bg-white/10 hover:text-white/80"
-                  aria-label={`Remove ${person}`}
-                >
-                  <X size={11} />
-                </button>
+                {!groupId && (
+                  <button
+                    type="button"
+                    onClick={() => removePerson(person)}
+                    className="flex h-4 w-4 items-center justify-center rounded-full text-white/40 transition hover:bg-white/10 hover:text-white/80"
+                    aria-label={`Remove ${person}`}
+                  >
+                    <X size={11} />
+                  </button>
+                )}
               </span>
             ))}
           </div>
-          <div className="mt-3 flex gap-2">
-            <input
-              value={nameInput}
-              onChange={(e) => setNameInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-              placeholder="Add a person…"
-              className="h-10 flex-1 rounded-xl border border-white/20 bg-white/[0.03] px-3 text-sm outline-none transition focus:border-[#f5a623]/70"
-            />
-            <Button
-              onClick={handleAdd}
-              variant="outline"
-              className="h-10 border-[#f5a623]/50 bg-[#f5a623]/10 text-[#f7bd57] hover:bg-[#f5a623]/20"
-            >
-              Add
-            </Button>
-          </div>
+          {!groupId && (
+            <div className="mt-3 flex gap-2">
+              <input
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                placeholder="Add a person…"
+                className="h-10 flex-1 rounded-xl border border-white/20 bg-white/[0.03] px-3 text-sm outline-none transition focus:border-[#f5a623]/70"
+              />
+              <Button
+                onClick={handleAdd}
+                variant="outline"
+                className="h-10 border-[#f5a623]/50 bg-[#f5a623]/10 text-[#f7bd57] hover:bg-[#f5a623]/20"
+              >
+                Add
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="glass-card rounded-3xl p-6">
@@ -359,13 +442,24 @@ function SplitPage() {
                 done={fullyAssigned}
               />
             )}
-            <Button
-              onClick={copyAll}
-              disabled={!fullyAssigned || people.length === 0}
-              className="gold-ring h-10 w-full rounded-xl bg-[#f5a623] font-semibold text-black hover:bg-[#f6b03f] disabled:opacity-40 disabled:shadow-none"
-            >
-              {copied ? 'Copied!' : 'Copy Summary'}
-            </Button>
+            {groupId ? (
+              <Button
+                onClick={saveSplit}
+                disabled={!fullyAssigned || people.length === 0 || saving}
+                className="gold-ring h-10 w-full rounded-xl bg-[#f5a623] font-semibold text-black hover:bg-[#f6b03f] disabled:opacity-40 disabled:shadow-none"
+              >
+                {saving ? 'Saving…' : 'Save Split'}
+              </Button>
+            ) : (
+              <Button
+                onClick={copyAll}
+                disabled={!fullyAssigned || people.length === 0}
+                className="gold-ring h-10 w-full rounded-xl bg-[#f5a623] font-semibold text-black hover:bg-[#f6b03f] disabled:opacity-40 disabled:shadow-none"
+              >
+                {copied ? 'Copied!' : 'Copy Summary'}
+              </Button>
+            )}
+            {saveError && <p className="text-center text-xs text-red-400">{saveError}</p>}
           </div>
         </div>
       </div>

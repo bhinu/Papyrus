@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
+import { useAuthStore } from '@/store/authStore'
 
 const container = {
   hidden: { opacity: 0, y: 20 },
@@ -17,6 +18,19 @@ const item = {
 }
 
 function LandingPage() {
+  const { user, loading } = useAuthStore()
+  const hasCode = window.location.search.includes('code=')
+  const hasError = window.location.search.includes('error=')
+
+  // Wait while auth code is being exchanged
+  if (hasCode && !user) return null
+
+  // Auth error from Supabase — just show the landing page
+  if (hasError) window.history.replaceState({}, '', '/')
+
+  // Redirect authenticated users straight to dashboard
+  if (!loading && user) return <Navigate to="/dashboard" replace />
+
   return (
     <motion.section
       className="glass-card mx-auto mt-14 max-w-4xl rounded-3xl p-8 text-center md:p-14"
@@ -41,7 +55,7 @@ function LandingPage() {
           asChild
           className="gold-ring h-11 rounded-xl bg-[#f5a623] px-6 text-[0.95rem] font-semibold text-black hover:bg-[#f6b03f]"
         >
-          <Link to="/upload">Start Splitting</Link>
+          <Link to="/login">Start Splitting</Link>
         </Button>
       </motion.div>
     </motion.section>

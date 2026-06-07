@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useReceipt } from '@/context/useReceipt'
 import { useSplitStore } from '@/store/splitStore'
@@ -24,8 +24,34 @@ function UploadPage() {
   const { file, previewUrl, error, isLoading, selectFile, uploadAndParse } = useReceipt()
   const setItems = useSplitStore((s) => s.setItems)
   const setCharges = useSplitStore((s) => s.setCharges)
+  const groupId = useSplitStore((s) => s.groupId)
+  const groupName = useSplitStore((s) => s.groupName)
   const [isDragging, setIsDragging] = useState(false)
   const [mismatch, setMismatch] = useState(null)
+
+  if (!groupId) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="mx-auto mt-10 max-w-2xl"
+      >
+        <div className="glass-card rounded-3xl p-8 text-center">
+          <h2 className="text-2xl font-semibold">No group selected</h2>
+          <p className="mt-3 text-sm text-white/65">
+            Start a new split from a group page so members are loaded automatically.
+          </p>
+          <Button
+            asChild
+            className="mt-6 h-10 rounded-xl bg-[#f5a623] px-5 font-semibold text-black hover:bg-[#f6b03f]"
+          >
+            <Link to="/dashboard">Go to Dashboard</Link>
+          </Button>
+        </div>
+      </motion.div>
+    )
+  }
 
   // Reset mismatch warning whenever the file changes. Use the "adjust state on
   // prop change" pattern (compare in render) rather than an effect; React
@@ -64,6 +90,11 @@ function UploadPage() {
       className="mx-auto max-w-4xl space-y-6"
     >
       <div className="glass-card rounded-3xl p-6 md:p-8">
+        {groupName && (
+          <div className="mb-4 inline-flex items-center gap-1.5 rounded-full border border-[#f5a623]/30 bg-[#f5a623]/10 px-3 py-1 text-xs text-[#f7bd57]">
+            Splitting for: <span className="font-semibold">{groupName}</span>
+          </div>
+        )}
         <h1 className="text-3xl font-semibold md:text-4xl">Upload Receipt</h1>
         <p className="mt-2 text-white/65">
           Drop a clear photo of your receipt. JPG, PNG, WEBP or GIF up to 10 MB.

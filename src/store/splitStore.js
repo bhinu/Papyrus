@@ -14,6 +14,24 @@ export const useSplitStore = create((set, get) => ({
   tip: 0,
   taxMode: 'proportional',
   tipMode: 'proportional',
+  groupId: null,
+  groupName: null,
+  groupMembers: [], // [{ userId, name }]
+
+  startGroupSplit: (groupId, members, groupName) =>
+    set({
+      groupId,
+      groupName: groupName ?? null,
+      groupMembers: members,
+      items: [],
+      people: members.map((m) => m.name),
+      assignments: {},
+      nextItemId: 1,
+      tax: 0,
+      tip: 0,
+    }),
+
+  clearGroupContext: () => set({ groupId: null, groupName: null, groupMembers: [] }),
 
   setItems: (items) => {
     const maxId = items.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0)

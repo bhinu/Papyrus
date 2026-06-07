@@ -153,15 +153,27 @@ function ParseResultPage() {
               You can add items manually below or upload a clearer photo.
             </div>
           ) : (
-            <div className="mt-4 space-y-2">
-              {items.map((it) => (
-                <ItemRow
-                  key={it.id}
-                  item={it}
-                  onChange={(patch) => updateItem(it.id, patch)}
-                  onRemove={() => removeItem(it.id)}
-                />
-              ))}
+            <div className="mt-4">
+              <div className="grid grid-cols-[1fr_96px_110px_28px] items-center gap-2 px-3 pb-2 text-[11px] uppercase tracking-wider text-white/40">
+                <span>Item</span>
+                <span className="text-right">Qty</span>
+                <span className="text-right">Price</span>
+                <span />
+              </div>
+              <div className="space-y-2">
+                {items.map((it) => (
+                  <ItemRow
+                    key={it.id}
+                    item={it}
+                    onChange={(patch) => updateItem(it.id, patch)}
+                    onRemove={() => removeItem(it.id)}
+                  />
+                ))}
+              </div>
+              <p className="mt-2 px-3 text-xs text-white/45">
+                Tap any field to edit. Extraction isn't perfect — fix anything that
+                looks wrong.
+              </p>
             </div>
           )}
 
@@ -194,35 +206,69 @@ function ParseResultPage() {
   )
 }
 
+const editableInput =
+  'h-9 rounded-md border border-white/10 bg-white/[0.03] px-2 text-sm outline-none transition focus:border-[#f5a623]/60 focus:bg-white/[0.06] hover:border-white/20 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none'
+
 function ItemRow({ item, onChange, onRemove }) {
+  const adjustQty = (delta) => {
+    const next = Math.max(0, Number(item.quantity || 0) + delta)
+    onChange({ quantity: next })
+  }
+
   return (
-    <div className="grid grid-cols-[1fr_70px_90px_auto] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.02] px-3 py-2">
+    <div className="grid grid-cols-[1fr_96px_110px_28px] items-center gap-2 rounded-xl border border-white/12 bg-white/[0.02] px-3 py-2">
       <input
         value={item.name}
         onChange={(e) => onChange({ name: e.target.value })}
         placeholder="Item name"
-        className="h-9 rounded-md bg-transparent px-2 text-sm outline-none focus:bg-white/[0.04]"
+        className={editableInput}
+        aria-label="Item name"
       />
-      <input
-        type="number"
-        min="0"
-        step="1"
-        value={item.quantity}
-        onChange={(e) => onChange({ quantity: e.target.value })}
-        className="h-9 rounded-md bg-transparent px-2 text-right text-sm outline-none focus:bg-white/[0.04]"
-      />
-      <input
-        type="number"
-        min="0"
-        step="0.01"
-        value={item.unitPrice}
-        onChange={(e) => onChange({ unitPrice: e.target.value })}
-        className="h-9 rounded-md bg-transparent px-2 text-right text-sm outline-none focus:bg-white/[0.04]"
-      />
+      <div className="flex h-9 items-stretch overflow-hidden rounded-md border border-white/10 bg-white/[0.03] transition focus-within:border-[#f5a623]/60 hover:border-white/20">
+        <button
+          type="button"
+          onClick={() => adjustQty(-1)}
+          className="w-7 text-white/55 hover:bg-white/[0.05] hover:text-white"
+          aria-label="Decrease quantity"
+        >
+          −
+        </button>
+        <input
+          type="number"
+          min="0"
+          step="1"
+          value={item.quantity}
+          onChange={(e) => onChange({ quantity: e.target.value })}
+          className="w-full bg-transparent px-1 text-center text-sm outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+          aria-label="Quantity"
+        />
+        <button
+          type="button"
+          onClick={() => adjustQty(1)}
+          className="w-7 text-white/55 hover:bg-white/[0.05] hover:text-white"
+          aria-label="Increase quantity"
+        >
+          +
+        </button>
+      </div>
+      <div className="relative">
+        <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-sm text-white/40">
+          $
+        </span>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={item.unitPrice}
+          onChange={(e) => onChange({ unitPrice: e.target.value })}
+          className={`${editableInput} w-full pl-5 text-right`}
+          aria-label="Unit price"
+        />
+      </div>
       <button
         type="button"
         onClick={onRemove}
-        className="text-white/45 transition hover:text-red-300"
+        className="text-lg text-white/45 transition hover:text-red-300"
         aria-label="Remove item"
       >
         ×

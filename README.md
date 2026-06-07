@@ -8,7 +8,7 @@ split it across people.
 
 - React + Vite + Tailwind v4 + shadcn/ui
 - React Router, Framer Motion
-- Express backend for the Anthropic API call (key stays on the server)
+- Express backend for the Anthropic API call
 
 ## Setup
 
@@ -20,6 +20,7 @@ npm run dev
 ```
 
 `npm run dev` boots both:
+
 - Vite client on `http://localhost:5173`
 - API server on `http://localhost:3001`
 
@@ -30,11 +31,11 @@ The client proxies `/api/*` to the server, so the frontend code just calls
 
 Variables read by the server (`server/index.js`):
 
-| Variable | Required | Default |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | yes | — |
-| `ANTHROPIC_MODEL` | no | `claude-sonnet-4-5` |
-| `PORT` | no | `3001` |
+| Variable            | Required | Default             |
+| ------------------- | -------- | ------------------- |
+| `ANTHROPIC_API_KEY` | yes      | —                   |
+| `ANTHROPIC_MODEL`   | no       | `claude-sonnet-4-5` |
+| `PORT`              | no       | `3001`              |
 
 ## Receipt parsing pipeline
 
@@ -62,6 +63,7 @@ tool call — simpler, cheaper, lower latency than two calls.
 ## Error handling
 
 Client surfaces:
+
 - `unsupported_type`, `file_too_large` — client-side validation before upload.
 - `server_misconfigured` — backend doesn't have an API key.
 - `network_error` — couldn't reach the server at all.

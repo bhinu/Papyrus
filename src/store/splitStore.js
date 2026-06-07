@@ -1,18 +1,45 @@
 import { create } from 'zustand'
 
-const MOCK_ITEMS = [
-  { id: 1, name: 'Truffle Fries', price: 11.5 },
-  { id: 2, name: 'Spicy Tuna Roll', price: 16.0 },
-  { id: 3, name: 'Still Water', price: 5.0 },
-  { id: 4, name: 'Matcha Cheesecake', price: 9.75 },
-]
-
 export const useSplitStore = create((set, get) => ({
-  items: MOCK_ITEMS,
+  items: [],
   people: [],
   assignments: {},
+  nextItemId: 1,
 
-  setItems: (items) => set({ items, assignments: {} }),
+  setItems: (items) => {
+    const maxId = items.reduce((m, it) => Math.max(m, Number(it.id) || 0), 0)
+    set({ items, assignments: {}, nextItemId: maxId + 1 })
+  },
+
+  addItem: (partial = {}) =>
+    set((s) => {
+      const id = s.nextItemId
+      const item = { id, name: partial.name || '', price: Number(partial.price) || 0 }
+      return { items: [...s.items, item], nextItemId: id + 1 }
+    }),
+
+  updateItem: (id, patch) =>
+    set((s) => ({
+      items: s.items.map((it) =>
+        it.id === id
+          ? {
+              ...it,
+              ...patch,
+              price: patch.price !== undefined ? Number(patch.price) || 0 : it.price,
+            }
+          : it,
+      ),
+    })),
+
+  removeItem: (id) =>
+    set((s) => {
+      const restAssignments = { ...s.assignments }
+      delete restAssignments[id]
+      return {
+        items: s.items.filter((it) => it.id !== id),
+        assignments: restAssignments,
+      }
+    }),
 
   addPerson: (name) =>
     set((s) => ({

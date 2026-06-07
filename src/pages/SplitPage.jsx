@@ -40,6 +40,15 @@ function SplitPage() {
   const totals = getTotals()
   const fullyAssigned = isFullyAssigned()
 
+  const itemsGrandTotal = items.reduce((sum, it) => sum + Number(it.price || 0), 0)
+  const itemsAssignedTotal = items.reduce(
+    (sum, it) => sum + ((assignments[it.id] || []).length > 0 ? Number(it.price || 0) : 0),
+    0,
+  )
+  const itemsRemaining = Math.max(0, itemsGrandTotal - itemsAssignedTotal)
+  const coveragePct =
+    itemsGrandTotal > 0 ? Math.min(100, (itemsAssignedTotal / itemsGrandTotal) * 100) : 0
+
   const plainTextSummary = Object.entries(totals)
     .map(([person, t]) => {
       const lineStr = t.lines
@@ -341,11 +350,14 @@ function SplitPage() {
             </div>
           )}
 
-          <div className="mt-5 space-y-2">
-            {!fullyAssigned && people.length > 0 && (
-              <p className="text-center text-xs text-red-400/80">
-                Assign every item before copying
-              </p>
+          <div className="mt-5 space-y-3">
+            {people.length > 0 && (
+              <CoverageMeter
+                remaining={itemsRemaining}
+                grandTotal={itemsGrandTotal}
+                pct={coveragePct}
+                done={fullyAssigned}
+              />
             )}
             <Button
               onClick={copyAll}
@@ -358,6 +370,32 @@ function SplitPage() {
         </div>
       </div>
     </motion.div>
+  )
+}
+
+function CoverageMeter({ remaining, grandTotal, pct, done }) {
+  return (
+    <div>
+      <div className="flex items-baseline justify-between text-xs">
+        {done ? (
+          <span className="font-medium text-emerald-300/90">Bill fully covered</span>
+        ) : (
+          <span className="text-white/65">
+            <span className="font-medium text-white">${remaining.toFixed(2)}</span>
+            <span className="text-white/45"> of ${grandTotal.toFixed(2)} left to assign</span>
+          </span>
+        )}
+        <span className="text-white/40">{Math.round(pct)}%</span>
+      </div>
+      <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div
+          className={`h-full rounded-full transition-all duration-300 ${
+            done ? 'bg-emerald-400/80' : 'bg-[#f5a623]'
+          }`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
   )
 }
 

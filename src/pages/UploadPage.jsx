@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { useReceipt } from '@/context/useReceipt'
 import { useSplitStore } from '@/store/splitStore'
+import { validateReceiptMath } from '@/lib/validateReceipt'
 
 function expandParsedItems(parsedItems) {
   const out = []
@@ -24,14 +25,35 @@ function UploadPage() {
   const setItems = useSplitStore((s) => s.setItems)
   const setCharges = useSplitStore((s) => s.setCharges)
   const [isDragging, setIsDragging] = useState(false)
+  const [mismatch, setMismatch] = useState(null)
 
-  const handleUpload = async () => {
-    const result = await uploadAndParse()
-    if (!result) return
-    if (result.is_receipt === false) return
+  // Reset mismatch warning whenever the file changes. Use the "adjust state on
+  // prop change" pattern (compare in render) rather than an effect; React
+  // discards this render and replays before painting, so no cascading update.
+  const [seedFile, setSeedFile] = useState(file)
+  if (file !== seedFile) {
+    setSeedFile(file)
+    setMismatch(null)
+  }
+
+  const proceedWith = (result) => {
     setItems(expandParsedItems(result.items))
     setCharges({ tax: result.tax, tip: result.tip })
     navigate('/split')
+  }
+
+  const handleUpload = async () => {
+    setMismatch(null)
+    const result = await uploadAndParse()
+    if (!result) return
+    if (result.is_receipt === false) return
+
+    const validation = validateReceiptMath(result)
+    if (!validation.skipped && !validation.ok) {
+      setMismatch({ result, validation })
+      return
+    }
+    proceedWith(result)
   }
 
   return (
@@ -91,6 +113,14 @@ function UploadPage() {
 
         <NotReceiptBanner />
 
+        {mismatch && (
+          <MismatchBanner
+            validation={mismatch.validation}
+            onContinue={() => proceedWith(mismatch.result)}
+            onReset={() => setMismatch(null)}
+          />
+        )}
+
         {error && (
           <div
             role="alert"
@@ -101,13 +131,17 @@ function UploadPage() {
           </div>
         )}
 
-        <Button
-          onClick={handleUpload}
-          disabled={!file || isLoading}
-          className="mt-6 h-11 rounded-xl bg-[#f5a623] px-6 font-semibold text-black hover:bg-[#f6b03f] disabled:opacity-50"
-        >
-          {isLoading ? 'Parsing receipt…' : 'Upload Receipt'}
-        </Button>
+        {!mismatch && (
+          <Button
+            onClick={handleUpload}
+            disabled={!file || isLoading}
+            className="mt-6 h-11 rounded-xl bg-[#f5a623] px-6 font-semibold text-black hover:bg-[#f6b03f] disabled:opacity-50"
+          >
+            {isLoading ? 'Parsing receipt…' : 'Upload Receipt'}
+          </Button>
+        )}
+
+        {isLoading && <ParsingProgress />}
       </div>
 
       <div className="glass-card rounded-2xl p-4">
@@ -141,6 +175,100 @@ function NotReceiptBanner() {
         {parseResult.not_receipt_reason ||
           'We could not identify this image as a real purchase receipt. Try a clearer photo of an itemized receipt.'}
       </p>
+    </div>
+  )
+}
+
+function MismatchBanner({ validation, onContinue, onReset }) {
+  const { itemsSum, tax, tip, expected, actual, diff } = validation
+  return (
+    <div
+      role="alert"
+      className="mt-5 rounded-xl border border-amber-400/40 bg-amber-400/10 px-4 py-4 text-sm text-amber-100"
+    >
+      <p className="font-medium">The numbers don't add up</p>
+      <p className="mt-1 text-amber-100/80">
+        The receipt's total doesn't match what we extracted. We may have missed an
+        item, misread a price, or there's an unprinted fee.
+      </p>
+
+      <dl className="mt-3 grid grid-cols-[1fr_auto] gap-x-6 gap-y-0.5 rounded-lg bg-black/15 px-3 py-2 text-xs">
+        <dt className="text-amber-100/70">Items subtotal</dt>
+        <dd className="text-right tabular-nums">${itemsSum.toFixed(2)}</dd>
+        {tax > 0 && (
+          <>
+            <dt className="text-amber-100/70">Tax / service</dt>
+            <dd className="text-right tabular-nums">${tax.toFixed(2)}</dd>
+          </>
+        )}
+        {tip > 0 && (
+          <>
+            <dt className="text-amber-100/70">Tip</dt>
+            <dd className="text-right tabular-nums">${tip.toFixed(2)}</dd>
+          </>
+        )}
+        <dt className="border-t border-amber-100/15 pt-1 text-amber-100/70">
+          What we added up
+        </dt>
+        <dd className="border-t border-amber-100/15 pt-1 text-right tabular-nums">
+          ${expected.toFixed(2)}
+        </dd>
+        <dt className="text-amber-100/70">Receipt total</dt>
+        <dd className="text-right tabular-nums">${actual.toFixed(2)}</dd>
+        <dt className="font-medium">Difference</dt>
+        <dd className="text-right font-medium tabular-nums">${diff.toFixed(2)}</dd>
+      </dl>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <Button
+          onClick={onContinue}
+          className="h-9 rounded-lg bg-amber-300/90 px-4 text-sm font-medium text-black hover:bg-amber-200"
+        >
+          Continue anyway
+        </Button>
+        <Button
+          onClick={onReset}
+          variant="outline"
+          className="h-9 rounded-lg border-amber-200/40 bg-transparent text-amber-100 hover:bg-amber-100/10"
+        >
+          Pick another image
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+const PARSING_PHASES = [
+  { until: 2500, label: 'Uploading image…' },
+  { until: 6000, label: 'Reading receipt…' },
+  { until: Infinity, label: 'Extracting line items…' },
+]
+
+function ParsingProgress() {
+  // Component mounts fresh each time isLoading flips on, so useState(0) is
+  // the initial value -- no need to reset inside the effect.
+  const [phaseIdx, setPhaseIdx] = useState(0)
+
+  useEffect(() => {
+    const start = Date.now()
+    const id = setInterval(() => {
+      const elapsed = Date.now() - start
+      const next = PARSING_PHASES.findIndex((p) => elapsed < p.until)
+      setPhaseIdx(next === -1 ? PARSING_PHASES.length - 1 : next)
+    }, 250)
+    return () => clearInterval(id)
+  }, [])
+
+  return (
+    <div className="mt-4" aria-live="polite">
+      <div className="relative h-1 overflow-hidden rounded-full bg-white/10">
+        <motion.div
+          className="absolute inset-y-0 w-1/3 rounded-full bg-[#f5a623]"
+          animate={{ x: ['-100%', '300%'] }}
+          transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+        />
+      </div>
+      <p className="mt-2 text-xs text-white/55">{PARSING_PHASES[phaseIdx].label}</p>
     </div>
   )
 }

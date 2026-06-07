@@ -5,18 +5,21 @@ import UploadPage from '@/pages/UploadPage'
 import ParseResultPage from '@/pages/ParseResultPage'
 import SplitPage from '@/pages/SplitPage'
 import SummaryPage from '@/pages/SummaryPage'
+import { ReceiptProvider } from '@/context/ReceiptContext'
 
 function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/upload" element={<UploadPage />} />
-        <Route path="/parse" element={<ParseResultPage />} />
-        <Route path="/split" element={<SplitPage />} />
-        <Route path="/summary" element={<SummaryPage />} />
-      </Routes>
-    </Layout>
+    <ReceiptProvider>
+      <Layout>
+        <Routes>
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/upload" element={<UploadPage />} />
+          <Route path="/parse" element={<ParseResultPage />} />
+          <Route path="/split" element={<SplitPage />} />
+          <Route path="/summary" element={<SummaryPage />} />
+        </Routes>
+      </Layout>
+    </ReceiptProvider>
   )
 }
 

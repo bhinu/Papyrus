@@ -11,6 +11,10 @@ function SplitPage() {
     items,
     people,
     assignments,
+    tax,
+    tip,
+    taxMode,
+    tipMode,
     addItem,
     updateItem,
     removeItem,
@@ -18,6 +22,7 @@ function SplitPage() {
     removePerson,
     toggleAssignment,
     toggleSelectAll,
+    setChargeMode,
     getTotals,
     isFullyAssigned,
   } = useSplitStore()
@@ -36,11 +41,15 @@ function SplitPage() {
   const fullyAssigned = isFullyAssigned()
 
   const plainTextSummary = Object.entries(totals)
-    .map(([person, { total, lines }]) => {
-      const lineStr = lines
+    .map(([person, t]) => {
+      const lineStr = t.lines
         .map((l) => `  - ${l.name}${l.split ? ' (split)' : ''}: $${l.amount.toFixed(2)}`)
         .join('\n')
-      return `${person}\n${lineStr}\n  Total: $${total.toFixed(2)}`
+      const extras = []
+      if (t.tax > 0) extras.push(`  Tax: $${t.tax.toFixed(2)}`)
+      if (t.tip > 0) extras.push(`  Tip: $${t.tip.toFixed(2)}`)
+      const extrasStr = extras.length ? `\n${extras.join('\n')}` : ''
+      return `${person}\n${lineStr}${extrasStr}\n  Total: $${t.total.toFixed(2)}`
     })
     .join('\n\n')
 
@@ -260,6 +269,27 @@ function SplitPage() {
         <div className="glass-card sticky top-6 rounded-3xl p-6">
           <p className="text-sm text-white/55">Summary</p>
 
+          {(tax > 0 || tip > 0) && (
+            <div className="mt-4 space-y-2">
+              {tax > 0 && (
+                <ChargeRow
+                  label="Tax / service"
+                  amount={tax}
+                  mode={taxMode}
+                  onModeChange={(m) => setChargeMode('tax', m)}
+                />
+              )}
+              {tip > 0 && (
+                <ChargeRow
+                  label="Tip"
+                  amount={tip}
+                  mode={tipMode}
+                  onModeChange={(m) => setChargeMode('tip', m)}
+                />
+              )}
+            </div>
+          )}
+
           {people.length === 0 ? (
             <p className="mt-6 text-center text-sm text-white/30">
               Add people to see totals
@@ -267,18 +297,18 @@ function SplitPage() {
           ) : (
             <div className="mt-4 space-y-4">
               {people.map((person) => {
-                const { total, lines } = totals[person]
+                const t = totals[person]
                 return (
                   <div key={person} className="rounded-2xl border border-white/10 p-4">
                     <div className="flex items-baseline justify-between">
                       <p className="font-medium">{person}</p>
                       <p className="text-lg font-semibold text-[#f5a623]">
-                        ${total.toFixed(2)}
+                        ${t.total.toFixed(2)}
                       </p>
                     </div>
-                    {lines.length > 0 && (
+                    {t.lines.length > 0 && (
                       <ul className="mt-2 space-y-1">
-                        {lines.map((line, i) => (
+                        {t.lines.map((line, i) => (
                           <li key={i} className="flex justify-between text-xs text-white/45">
                             <span>
                               {line.name}
@@ -287,6 +317,22 @@ function SplitPage() {
                             <span>${line.amount.toFixed(2)}</span>
                           </li>
                         ))}
+                      </ul>
+                    )}
+                    {(t.tax > 0 || t.tip > 0) && (
+                      <ul className="mt-2 space-y-1 border-t border-white/10 pt-2">
+                        {t.tax > 0 && (
+                          <li className="flex justify-between text-xs text-white/55">
+                            <span>+ Tax / service</span>
+                            <span>${t.tax.toFixed(2)}</span>
+                          </li>
+                        )}
+                        {t.tip > 0 && (
+                          <li className="flex justify-between text-xs text-white/55">
+                            <span>+ Tip</span>
+                            <span>${t.tip.toFixed(2)}</span>
+                          </li>
+                        )}
                       </ul>
                     )}
                   </div>
@@ -312,6 +358,45 @@ function SplitPage() {
         </div>
       </div>
     </motion.div>
+  )
+}
+
+function ChargeRow({ label, amount, mode, onModeChange }) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/[0.02] px-3 py-2">
+      <div>
+        <p className="text-xs text-white/55">{label}</p>
+        <p className="text-sm font-medium">${amount.toFixed(2)}</p>
+      </div>
+      <div
+        role="radiogroup"
+        aria-label={`${label} split method`}
+        className="flex rounded-md border border-white/10 bg-white/[0.03] p-0.5 text-[11px]"
+      >
+        {[
+          { id: 'proportional', label: 'Proportional' },
+          { id: 'equal', label: 'Equal' },
+        ].map((opt) => {
+          const active = mode === opt.id
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              onClick={() => onModeChange(opt.id)}
+              className={`rounded px-2 py-1 transition ${
+                active
+                  ? 'bg-[#f5a623]/20 text-[#f6c065]'
+                  : 'text-white/55 hover:text-white/80'
+              }`}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

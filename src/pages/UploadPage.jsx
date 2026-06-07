@@ -22,6 +22,7 @@ function UploadPage() {
   const navigate = useNavigate()
   const { file, previewUrl, error, isLoading, selectFile, uploadAndParse } = useReceipt()
   const setItems = useSplitStore((s) => s.setItems)
+  const setCharges = useSplitStore((s) => s.setCharges)
   const [isDragging, setIsDragging] = useState(false)
 
   const handleUpload = async () => {
@@ -29,6 +30,7 @@ function UploadPage() {
     if (!result) return
     if (result.is_receipt === false) return
     setItems(expandParsedItems(result.items))
+    setCharges({ tax: result.tax, tip: result.tip })
     navigate('/split')
   }
 

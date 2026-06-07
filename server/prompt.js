@@ -26,6 +26,10 @@ When the image IS a receipt, extract line items with care:
 - Prices are floats in the receipt's currency. Do not invent a currency
   symbol; just record the numeric value.
 - Capture subtotal, tax, tip, and total separately when present.
+- Treat any mandatory non-item charge (service charge, gratuity included,
+  cover charge, resort fee, etc.) as TAX. Add it to the tax field on top of
+  the actual sales tax. Only put a charge in the tip field if it is an
+  optional / voluntary gratuity that the customer chose to add.
 
 If the receipt is real but you cannot confidently read any line items
 (e.g., the image is too blurry, cut off, or only shows the total), set
@@ -86,8 +90,17 @@ export const RECEIPT_TOOL = {
         },
       },
       subtotal: { type: 'number', minimum: 0 },
-      tax: { type: 'number', minimum: 0 },
-      tip: { type: 'number', minimum: 0 },
+      tax: {
+        type: 'number',
+        minimum: 0,
+        description:
+          'Sales tax plus any mandatory non-item charges (service charge, resort fee, etc.) combined into one value.',
+      },
+      tip: {
+        type: 'number',
+        minimum: 0,
+        description: 'Voluntary gratuity only. Mandatory service charges go in tax, not here.',
+      },
       total: { type: 'number', minimum: 0 },
       parse_notes: {
         type: 'string',
